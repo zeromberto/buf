@@ -64,7 +64,7 @@ func (g *generator) Generate(
 	pluginOut string,
 	requests []*pluginpb.CodeGeneratorRequest,
 	options ...GenerateOption,
-) (retErr error) {
+) (_ *pluginpb.CodeGeneratorResponse, retErr error) {
 	generateOptions := newGenerateOptions()
 	for _, option := range options {
 		option(generateOptions)
@@ -76,48 +76,147 @@ func (g *generator) Generate(
 		appprotoexec.HandlerWithPluginPath(generateOptions.pluginPath),
 	)
 	if err != nil {
+		return nil, err
+	}
+	var response *pluginpb.CodeGeneratorResponse
+	generateFunc := func(writeBucket storage.WriteBucket) error {
+		var generateOptions []appproto.GenerateOption
+		if readBucket, ok := writeBucket.(storage.ReadBucket); ok {
+			// We have to manually assert that we have a ReadBucket
+			// since the storagemem.ReadBucketBuilder doesn't implement
+			// the storage.ReadBucket interface.
+			//
+			// Insertion points aren't supported for .jar and .zip results.
+			// If we were to support this, we would need to write everything
+			// to a temporary directory, or support reading from a partially
+			// computed storage.ReadBucket.
+			//
+			// For example,
+			//
+			//  # buf.gen.yaml
+			//  version: v1
+			//  plugins:
+			//    - name: insertion-point-receiver
+			//      out: foo.zip
+			//    - name: insertion-point-writer
+			//      out: bar.zip
+			generateOptions = append(
+				generateOptions,
+				appproto.GenerateWithInsertionPointReadBucket(readBucket),
+			)
+		}
+		// If successful, we return the the CodeGeneratorResponse created here.
+		appprotoGenerator := appproto.NewGenerator(g.logger, handler)
+		response, err = appprotoGenerator.Generate(
+			ctx,
+			container,
+			writeBucket,
+			requests,
+			generateOptions...,
+		)
 		return err
 	}
-	appprotoGenerator := appproto.NewGenerator(g.logger, handler)
+	if err := g.generate(
+		ctx,
+		generateFunc,
+		pluginOut,
+		generateOptions.createOutDirIfNotExists,
+	); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (g *generator) GenerateWithResponse(
+	ctx context.Context,
+	pluginOut string,
+	response *pluginpb.CodeGeneratorResponse,
+	options ...GenerateOption,
+) (retErr error) {
+	generateOptions := newGenerateOptions()
+	for _, option := range options {
+		option(generateOptions)
+	}
+	appprotoGenerator := appproto.NewGenerator(g.logger, nil /* We don't use a handler here */)
+	generateFunc := func(writeBucket storage.WriteBucket) error {
+		var generateOptions []appproto.GenerateOption
+		if readBucket, ok := writeBucket.(storage.ReadBucket); ok {
+			// We have to manually assert that we have a ReadBucket
+			// since the storagemem.ReadBucketBuilder doesn't implement
+			// the storage.ReadBucket interface.
+			//
+			// Insertion points aren't supported for .jar and .zip results.
+			// If we were to support this, we would need to write everything
+			// to a temporary directory, or support reading from a partially
+			// computed storage.ReadBucket before it's actually written as
+			// an archive.
+			//
+			// For example,
+			//
+			//  # buf.gen.yaml
+			//  version: v1
+			//  plugins:
+			//    - name: insertion-point-receiver
+			//      out: foo.zip
+			//    - name: insertion-point-writer
+			//      out: bar.zip
+			generateOptions = append(
+				generateOptions,
+				appproto.GenerateWithInsertionPointReadBucket(readBucket),
+			)
+		}
+		return appprotoGenerator.GenerateWithResponse(
+			ctx,
+			writeBucket,
+			response,
+			generateOptions...,
+		)
+	}
+	return g.generate(
+		ctx,
+		generateFunc,
+		pluginOut,
+		generateOptions.createOutDirIfNotExists,
+	)
+}
+
+func (g *generator) generate(
+	ctx context.Context,
+	generateFunc func(storage.WriteBucket) error,
+	pluginOut string,
+	createOutDirIfNotExists bool,
+) error {
 	switch filepath.Ext(pluginOut) {
 	case ".jar":
 		return g.generateZip(
 			ctx,
-			container,
-			appprotoGenerator,
+			generateFunc,
 			pluginOut,
-			requests,
 			true,
-			generateOptions.createOutDirIfNotExists,
+			createOutDirIfNotExists,
 		)
 	case ".zip":
 		return g.generateZip(
 			ctx,
-			container,
-			appprotoGenerator,
+			generateFunc,
 			pluginOut,
-			requests,
 			false,
-			generateOptions.createOutDirIfNotExists,
+			createOutDirIfNotExists,
 		)
 	default:
 		return g.generateDirectory(
 			ctx,
-			container,
-			appprotoGenerator,
+			generateFunc,
 			pluginOut,
-			requests,
-			generateOptions.createOutDirIfNotExists,
+			createOutDirIfNotExists,
 		)
 	}
 }
 
 func (g *generator) generateZip(
 	ctx context.Context,
-	container app.EnvStderrContainer,
-	appprotoGenerator appproto.Generator,
+	generateFunc func(storage.WriteBucket) error,
 	outFilePath string,
-	requests []*pluginpb.CodeGeneratorRequest,
 	includeManifest bool,
 	createOutDirIfNotExists bool,
 ) (retErr error) {
@@ -139,7 +238,7 @@ func (g *generator) generateZip(
 		return fmt.Errorf("not a directory: %s", outDirPath)
 	}
 	readBucketBuilder := storagemem.NewReadBucketBuilder()
-	if err := appprotoGenerator.Generate(ctx, container, readBucketBuilder, requests); err != nil {
+	if err := generateFunc(readBucketBuilder); err != nil {
 		return err
 	}
 	if includeManifest {
@@ -164,10 +263,8 @@ func (g *generator) generateZip(
 
 func (g *generator) generateDirectory(
 	ctx context.Context,
-	container app.EnvStderrContainer,
-	appprotoGenerator appproto.Generator,
+	generateFunc func(storage.WriteBucket) error,
 	outDirPath string,
-	requests []*pluginpb.CodeGeneratorRequest,
 	createOutDirIfNotExists bool,
 ) error {
 	if createOutDirIfNotExists {
@@ -183,13 +280,7 @@ func (g *generator) generateDirectory(
 	if err != nil {
 		return err
 	}
-	return appprotoGenerator.Generate(
-		ctx,
-		container,
-		readWriteBucket,
-		requests,
-		appproto.GenerateWithInsertionPointReadBucket(readWriteBucket),
-	)
+	return generateFunc(readWriteBucket)
 }
 
 type generateOptions struct {

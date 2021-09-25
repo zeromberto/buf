@@ -24,17 +24,27 @@ import (
 	"google.golang.org/protobuf/types/pluginpb"
 )
 
+// Generator is used to generate code to the OS filesystem.
 type Generator interface {
 	// Generate generates to the os filesystem, switching on the file extension.
 	// If there is a .jar extension, this generates a jar. If there is a .zip
 	// extension, this generates a zip. If there is no extension, this outputs
-	// to the directory.
+	// to the directory. The corresponding CodeGeneratorResponse written is returned.
 	Generate(
 		ctx context.Context,
 		container app.EnvStderrContainer,
 		pluginName string,
 		pluginOut string,
 		requests []*pluginpb.CodeGeneratorRequest,
+		options ...GenerateOption,
+	) (*pluginpb.CodeGeneratorResponse, error)
+
+	// GenerateWithResponses works the same as Generate, but uses the given
+	// CodeGeneratorRespones rather than executing plugins itself.
+	GenerateWithResponse(
+		ctx context.Context,
+		pluginOut string,
+		response *pluginpb.CodeGeneratorResponse,
 		options ...GenerateOption,
 	) error
 }

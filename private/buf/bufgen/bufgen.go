@@ -161,6 +161,21 @@ type PluginConfig struct {
 	Strategy Strategy
 }
 
+// PluginName returns this PluginConfig's plugin name.
+// Only one of Name or Remote will be set.
+func (p *PluginConfig) PluginName() string {
+	if p == nil {
+		return ""
+	}
+	if p.Name != "" {
+		return p.Name
+	}
+	if p.Remote != "" {
+		return p.Remote
+	}
+	return ""
+}
+
 // ManagedConfig is the Managed Mode configuration.
 type ManagedConfig struct {
 	CcEnableArenas        *bool

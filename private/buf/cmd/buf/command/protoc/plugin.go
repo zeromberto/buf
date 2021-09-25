@@ -49,7 +49,7 @@ func executePlugin(
 	pluginName string,
 	pluginInfo *pluginInfo,
 ) error {
-	if err := appprotoos.NewGenerator(logger, storageosProvider).Generate(
+	if _, err := appprotoos.NewGenerator(logger, storageosProvider).Generate(
 		ctx,
 		container,
 		pluginName,

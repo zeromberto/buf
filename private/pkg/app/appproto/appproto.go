@@ -124,6 +124,14 @@ type Generator interface {
 		writeBucket storage.WriteBucket,
 		requests []*pluginpb.CodeGeneratorRequest,
 		options ...GenerateOption,
+	) (*pluginpb.CodeGeneratorResponse, error)
+
+	// GenerateWithResponse generates to the bucket with the given response.
+	GenerateWithResponse(
+		ctx context.Context,
+		writeBucket storage.WriteBucket,
+		response *pluginpb.CodeGeneratorResponse,
+		options ...GenerateOption,
 	) error
 }
 

@@ -48,16 +48,37 @@ func (g *generator) Generate(
 	writeBucket storage.WriteBucket,
 	requests []*pluginpb.CodeGeneratorRequest,
 	options ...GenerateOption,
+) (*pluginpb.CodeGeneratorResponse, error) {
+	response, err := g.getResponse(ctx, container, requests)
+	if err != nil {
+		return nil, err
+	}
+	if err := g.generate(ctx, writeBucket, response, options...); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (g *generator) GenerateWithResponse(
+	ctx context.Context,
+	writeBucket storage.WriteBucket,
+	response *pluginpb.CodeGeneratorResponse,
+	options ...GenerateOption,
+) error {
+	return g.generate(ctx, writeBucket, response, options...)
+}
+
+func (g *generator) generate(
+	ctx context.Context,
+	writeBucket storage.WriteBucket,
+	response *pluginpb.CodeGeneratorResponse,
+	options ...GenerateOption,
 ) error {
 	generateOptions := newGenerateOptions()
 	for _, option := range options {
 		option(generateOptions)
 	}
-	files, err := g.getResponseFiles(ctx, container, requests)
-	if err != nil {
-		return err
-	}
-	for _, file := range files {
+	for _, file := range response.File {
 		if file.GetInsertionPoint() != "" {
 			if generateOptions.insertionPointReadBucket == nil {
 				return storage.NewErrNotExist(file.GetName())
@@ -72,11 +93,11 @@ func (g *generator) Generate(
 	return nil
 }
 
-func (g *generator) getResponseFiles(
+func (g *generator) getResponse(
 	ctx context.Context,
 	container app.EnvStderrContainer,
 	requests []*pluginpb.CodeGeneratorRequest,
-) ([]*pluginpb.CodeGeneratorResponse_File, error) {
+) (*pluginpb.CodeGeneratorResponse, error) {
 	responseWriter := newResponseWriter(container)
 	jobs := make([]func(context.Context) error, len(requests))
 	for i, request := range requests {
@@ -100,7 +121,7 @@ func (g *generator) getResponseFiles(
 	if errString := response.GetError(); errString != "" {
 		return nil, errors.New(errString)
 	}
-	return response.File, nil
+	return response, nil
 }
 
 // applyInsertionPoint inserts the content of the given file at the insertion point that it specfiies.
