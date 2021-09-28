@@ -125,9 +125,12 @@ type Generator interface {
 		requests []*pluginpb.CodeGeneratorRequest,
 		options ...GenerateOption,
 	) (*pluginpb.CodeGeneratorResponse, error)
+}
 
-	// GenerateWithResponse generates to the bucket with the given response.
-	GenerateWithResponse(
+// TODO: better name
+type ResponseHandler interface {
+	// HandleResponse generates to the bucket with the given response.
+	HandleResponse(
 		ctx context.Context,
 		writeBucket storage.WriteBucket,
 		response *pluginpb.CodeGeneratorResponse,
@@ -153,9 +156,15 @@ func GenerateWithInsertionPointReadBucket(
 // NewGenerator returns a new Generator.
 func NewGenerator(
 	logger *zap.Logger,
+	responseHandler ResponseHandler,
 	handler Handler,
 ) Generator {
-	return newGenerator(logger, handler)
+	return newGenerator(logger, responseHandler, handler)
+}
+
+// NewResponseHandler returns a new ResponseHandler.
+func NewResponseHandler(logger *zap.Logger) ResponseHandler {
+	return newResponseHandler(logger)
 }
 
 // newRunFunc returns a new RunFunc for app.Main and app.Run.

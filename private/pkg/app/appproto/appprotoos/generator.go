@@ -106,8 +106,7 @@ func (g *generator) Generate(
 			)
 		}
 		// If successful, we return the the CodeGeneratorResponse created here.
-		appprotoGenerator := appproto.NewGenerator(g.logger, handler)
-		response, err = appprotoGenerator.Generate(
+		response, err = appproto.NewGenerator(g.logger, handler).Generate(
 			ctx,
 			container,
 			writeBucket,
