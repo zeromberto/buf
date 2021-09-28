@@ -105,6 +105,7 @@ func (c *cloner) CloneToBucket(
 	cmd.Dir = bareDir.AbsPath()
 	cmd.Env = app.Environ(envContainer)
 	cmd.Stderr = buffer
+	c.logger.Debug("git", zap.String("dir", cmd.Dir), zap.Strings("cmd",cmd.Args))
 	if err := cmd.Run(); err != nil {
 		return newGitCommandError(err, buffer, bareDir)
 	}
@@ -120,6 +121,7 @@ func (c *cloner) CloneToBucket(
 	cmd = exec.CommandContext(ctx, "git", remoteArgs...)
 	cmd.Env = app.Environ(envContainer)
 	cmd.Stderr = buffer
+	c.logger.Debug("git", zap.String("dir", cmd.Dir), zap.Strings("cmd",cmd.Args))
 	if err := cmd.Run(); err != nil {
 		return newGitCommandError(err, buffer, bareDir)
 	}
@@ -154,6 +156,7 @@ func (c *cloner) CloneToBucket(
 	cmd = exec.CommandContext(ctx, "git", fetchArgs...)
 	cmd.Env = app.Environ(envContainer)
 	cmd.Stderr = buffer
+	c.logger.Debug("git", zap.String("dir", cmd.Dir), zap.Strings("cmd",cmd.Args))
 	if err := cmd.Run(); err != nil {
 		return newGitCommandError(err, buffer, bareDir)
 	}
@@ -170,6 +173,7 @@ func (c *cloner) CloneToBucket(
 	cmd = exec.CommandContext(ctx, "git", args...)
 	cmd.Env = app.Environ(envContainer)
 	cmd.Stderr = buffer
+	c.logger.Debug("git", zap.String("dir", cmd.Dir), zap.Strings("cmd",cmd.Args))
 	if err := cmd.Run(); err != nil {
 		return newGitCommandError(err, buffer, worktreeDir)
 	}
@@ -185,6 +189,7 @@ func (c *cloner) CloneToBucket(
 		cmd.Dir = worktreeDir.AbsPath()
 		cmd.Env = app.Environ(envContainer)
 		cmd.Stderr = buffer
+		c.logger.Debug("git", zap.String("dir", cmd.Dir), zap.Strings("cmd",cmd.Args))
 		if err := cmd.Run(); err != nil {
 			return newGitCommandError(err, buffer, worktreeDir)
 		}
@@ -205,6 +210,7 @@ func (c *cloner) CloneToBucket(
 		cmd.Dir = worktreeDir.AbsPath()
 		cmd.Env = app.Environ(envContainer)
 		cmd.Stderr = buffer
+		c.logger.Debug("git", zap.String("dir", cmd.Dir), zap.Strings("cmd",cmd.Args))
 		if err := cmd.Run(); err != nil {
 			// Suppress printing of temp path
 			return fmt.Errorf("%v\n%v", err, strings.Replace(buffer.String(), worktreeDir.AbsPath(), "", -1))
