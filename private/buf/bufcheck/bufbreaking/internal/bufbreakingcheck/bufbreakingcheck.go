@@ -20,12 +20,109 @@ package bufbreakingcheck
 import (
 	"errors"
 	"fmt"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"strconv"
 	"strings"
+
+	"github.com/envoyproxy/protoc-gen-validate/validate"
+	"google.golang.org/genproto/googleapis/api/annotations"
 
 	"github.com/bufbuild/buf/private/pkg/protosource"
 	"github.com/bufbuild/buf/private/pkg/stringutil"
 )
+
+// CheckFieldNoStricterValidation is a check function.
+var CheckFieldNoStricterValidation = newFieldPairCheckFunc(checkFieldNoStricterValidation)
+
+func checkFieldNoStricterValidation(add addFunc, corpus *corpus, previousField protosource.Field, field protosource.Field) error {
+	if extension, hasValidation := field.OptionExtension(validate.E_Rules); hasValidation {
+		if fieldRules, ok := extension.(*validate.FieldRules); ok {
+			if previousExtension, previousHasValidation := previousField.OptionExtension(validate.E_Rules); previousHasValidation {
+				if previousFieldRules, ok := previousExtension.(*validate.FieldRules); ok {
+					println(field.Name())
+					if isStricter(fieldRules, previousFieldRules) {
+						add(field, nil, field.Location(), `Previously validated field %q has different rule %q.`, previousField.Name(), previousFieldRules)
+						return nil
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func proof(rule, previous interface {
+	String() string
+	ProtoReflect() protoreflect.Message
+}) bool {
+	// TODO: Machs gscheid
+	if rule.String() != "<nil>" {
+		if previous.String() != "<nil>" {
+			if rule.String() != previous.String() {
+				println("nil", rule.String(), rule.ProtoReflect().Descriptor().Name(), previous.String(), previous.ProtoReflect().Descriptor().Name())
+				return true
+			} else {
+				return false
+			}
+		}
+		println("nil", rule.String(), rule.ProtoReflect().Descriptor().Name(), previous.String(), previous.ProtoReflect().Descriptor().Name())
+		return true
+	}
+	return false
+}
+
+func isStricter(rules, previous *validate.FieldRules) bool {
+	return proof(rules.GetAny(), previous.GetAny()) ||
+		proof(rules.GetBool(), previous.GetBool()) ||
+		proof(rules.GetBytes(), previous.GetBytes()) ||
+		proof(rules.GetDouble(), previous.GetDouble()) ||
+		proof(rules.GetDuration(), previous.GetDuration()) ||
+		proof(rules.GetEnum(), previous.GetEnum()) ||
+		proof(rules.GetFixed32(), previous.GetFixed32()) ||
+		proof(rules.GetFixed64(), previous.GetFixed64()) ||
+		proof(rules.GetFloat(), previous.GetFloat()) ||
+		proof(rules.GetInt32(), previous.GetInt32()) ||
+		proof(rules.GetInt64(), previous.GetInt64()) ||
+		proof(rules.GetMap(), previous.GetMap()) ||
+		proof(rules.GetMessage(), previous.GetMessage()) ||
+		proof(rules.GetRepeated(), previous.GetRepeated()) ||
+		proof(rules.GetSfixed32(), previous.GetSfixed32()) ||
+		proof(rules.GetSfixed64(), previous.GetSfixed64()) ||
+		proof(rules.GetSint32(), previous.GetSint32()) ||
+		proof(rules.GetSint64(), previous.GetSint64()) ||
+		proof(rules.GetString_(), previous.GetString_()) ||
+		proof(rules.GetTimestamp(), previous.GetTimestamp()) ||
+		proof(rules.GetUint32(), previous.GetUint32()) ||
+		proof(rules.GetUint64(), previous.GetUint64())
+}
+
+// CheckFieldNotRequired is a check function.
+var CheckFieldNotRequired = newFieldPairCheckFunc(checkFieldNotRequired)
+
+func checkFieldNotRequired(add addFunc, corpus *corpus, previousField protosource.Field, field protosource.Field) error {
+	if extension, hasFieldBehavior := field.OptionExtension(annotations.E_FieldBehavior); hasFieldBehavior {
+		if fieldBehaviors, ok := extension.([]annotations.FieldBehavior); ok {
+			for _, behavior := range fieldBehaviors {
+				if behavior.String() == "REQUIRED" {
+					if previousExtension, previousHasFieldBehavior := previousField.OptionExtension(annotations.E_FieldBehavior); previousHasFieldBehavior {
+						if previousFieldBehaviors, previousOk := previousExtension.([]annotations.FieldBehavior); previousOk {
+							for _, previousBehavior := range previousFieldBehaviors {
+								if previousBehavior.String() == "REQUIRED" {
+									return nil
+								}
+							}
+							add(field, nil, field.Location(), `Previously OPTIONAL field %q was REQUIRED.`, previousField.Name())
+							return nil
+						}
+					}
+					add(field, nil, field.Location(), `Previously unannotated field %q was REQUIRED.`, previousField.Name())
+					return nil
+				}
+			}
+		}
+	}
+	return nil
+}
 
 // CheckEnumNoDelete is a check function.
 var CheckEnumNoDelete = newFilePairCheckFunc(checkEnumNoDelete)

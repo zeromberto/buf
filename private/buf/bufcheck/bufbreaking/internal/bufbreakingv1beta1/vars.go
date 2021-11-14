@@ -77,6 +77,8 @@ var (
 		bufbreakingbuild.RPCSameResponseTypeRuleBuilder,
 		bufbreakingbuild.RPCSameServerStreamingRuleBuilder,
 		bufbreakingbuild.ServiceNoDeleteRuleBuilder,
+		bufbreakingbuild.CheckFieldNotRequiredBuilder,
+		bufbreakingbuild.CheckFieldNoStricterValidationBuilder,
 	}
 
 	// v1beta1DefaultCategories are the default categories.
@@ -89,6 +91,7 @@ var (
 		"PACKAGE",
 		"WIRE_JSON",
 		"WIRE",
+		"FIELD_ANNOTATIONS",
 	}
 	// v1beta1IDToCategories associates IDs to categories.
 	v1beta1IDToCategories = map[string][]string{
@@ -327,6 +330,12 @@ var (
 		},
 		"SERVICE_NO_DELETE": {
 			"FILE",
+		},
+		"FIELD_NO_REQUIRED": {
+			"FIELD_ANNOTATIONS",
+		},
+		"FIELD_STRICTER_VALIDATION": {
+			"FIELD_ANNOTATIONS",
 		},
 	}
 )

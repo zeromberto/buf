@@ -26,6 +26,20 @@ import (
 )
 
 var (
+	// CheckFieldNoStricterValidationBuilder is a rule builder.
+	CheckFieldNoStricterValidationBuilder = internal.NewNopRuleBuilder(
+		"FIELD_STRICTER_VALIDATION",
+		"field has stricter validation rule",
+		bufbreakingcheck.CheckFieldNoStricterValidation,
+	)
+
+	// CheckFieldNotRequiredBuilder is a rule builder.
+	CheckFieldNotRequiredBuilder = internal.NewNopRuleBuilder(
+		"FIELD_NO_REQUIRED",
+		"field was not required",
+		bufbreakingcheck.CheckFieldNotRequired,
+	)
+
 	// EnumNoDeleteRuleBuilder is a rule builder.
 	EnumNoDeleteRuleBuilder = internal.NewNopRuleBuilder(
 		"ENUM_NO_DELETE",
